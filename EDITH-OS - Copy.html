@@ -1,0 +1,705 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDITH | Even Dead, I Am The Hero</title>
+    <!-- External Assets -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase Compat for Global Link -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --glass: rgba(15, 15, 25, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.5);
+            --text: #e0e0e0;
+            --bg-blur: blur(15px);
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; user-select: none; }
+        body, html { width: 100vw; height: 100vh; overflow: hidden; background: #000; color: var(--text); }
+
+        #desktop {
+            width: 100%;
+            height: 100vh;
+            background: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2072') center/cover no-repeat;
+            position: relative;
+            z-index: 1;
+            transition: filter 0.5s ease;
+        }
+
+        /* --- Boot & Login --- */
+        #boot-screen {
+            position: fixed; inset: 0; background: #000; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 1s ease;
+        }
+        .arc-reactor {
+            width: 100px; height: 100px; border-radius: 50%;
+            border: 4px solid var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow), inset 0 0 20px var(--accent-glow);
+            animation: pulse 2s infinite linear;
+        }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.5; } }
+
+        #login-screen {
+            position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(20px); display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .login-card {
+            background: var(--glass); padding: 40px; border-radius: 24px;
+            border: 1px solid var(--glass-border); text-align: center; width: 320px;
+        }
+        .login-card h1 { font-family: 'Orbitron'; font-size: 1.5rem; margin-bottom: 20px; color: var(--accent); }
+        .login-input {
+            width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+            padding: 12px; border-radius: 8px; color: white; margin-bottom: 15px; outline: none;
+        }
+        .login-btn {
+            width: 100%; padding: 12px; background: var(--accent); border: none; border-radius: 8px;
+            color: black; font-weight: bold; cursor: pointer; transition: var(--transition);
+        }
+        .login-btn:hover { transform: scale(1.05); box-shadow: 0 0 15px var(--accent); }
+
+        /* --- Desktop Icons --- */
+        #icon-grid {
+            padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, 100px);
+            grid-template-rows: repeat(auto-fill, 100px); gap: 20px; height: calc(100vh - 60px);
+        }
+        .desktop-icon {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: var(--transition); border-radius: 12px; padding: 10px;
+        }
+        .desktop-icon:hover { background: rgba(255,255,255,0.1); backdrop-filter: blur(5px); }
+        .desktop-icon i { font-size: 32px; margin-bottom: 8px; color: var(--accent); }
+        .desktop-icon span { font-size: 12px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+
+        /* --- Window System --- */
+        .window {
+            position: absolute; min-width: 300px; min-height: 200px;
+            background: var(--glass); backdrop-filter: var(--bg-blur);
+            border: 1px solid var(--glass-border); border-radius: 12px;
+            overflow: hidden; display: flex; flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); z-index: 10;
+            animation: winOpen 0.3s ease-out;
+        }
+        @keyframes winOpen { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .win-header {
+            padding: 12px 16px; background: rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center; cursor: move;
+        }
+        .win-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .win-controls { display: flex; gap: 10px; }
+        .win-btn { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
+        .btn-close { background: #ff5f56; }
+        .btn-min { background: #ffbd2e; }
+        .btn-max { background: #27c93f; }
+        .win-body { flex: 1; position: relative; overflow: auto; padding: 15px; }
+
+        /* --- Taskbar --- */
+        #taskbar {
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            height: 60px; background: var(--glass); backdrop-filter: var(--bg-blur);
+            border: 1px solid var(--glass-border); border-radius: 20px;
+            display: flex; align-items: center; padding: 0 20px; gap: 15px; z-index: 1000;
+        }
+        .task-item {
+            width: 40px; height: 40px; border-radius: 10px; display: flex;
+            align-items: center; justify-content: center; cursor: pointer;
+            transition: var(--transition); color: var(--accent);
+        }
+        .task-item:hover { background: rgba(255,255,255,0.1); transform: translateY(-5px); }
+        .task-divider { width: 1px; height: 30px; background: var(--glass-border); }
+        .task-time { font-size: 13px; font-weight: 600; margin-left: 10px; }
+
+        /* --- AI Assistant --- */
+        .ai-container { height: 100%; display: flex; flex-direction: column; }
+        #ai-chat { flex: 1; overflow-y: auto; padding-bottom: 10px; }
+        .chat-msg { margin-bottom: 10px; padding: 10px; border-radius: 8px; font-size: 14px; line-height: 1.4; }
+        .msg-ai { background: rgba(0, 210, 255, 0.1); border-left: 3px solid var(--accent); }
+        .msg-user { background: rgba(255,255,255,0.05); text-align: right; }
+        .ai-input-area { display: flex; gap: 10px; margin-top: 10px; }
+
+        /* --- Global Link Specific Styles --- */
+        #chat-history { height: 300px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .bubble { padding: 10px 15px; border-radius: 15px; max-width: 80%; font-size: 13px; }
+        .bubble.me { align-self: flex-end; background: var(--accent); color: #000; font-weight: 500; }
+        .bubble.other { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); }
+
+        /* --- Apps Specifics --- */
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .calc-btn { 
+            padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+            border-radius: 8px; color: white; cursor: pointer; font-weight: bold;
+        }
+        .calc-btn:hover { background: var(--accent); color: black; }
+        .calc-display {
+            grid-column: span 4; background: #000; padding: 15px; text-align: right;
+            font-size: 20px; border-radius: 8px; margin-bottom: 10px;
+        }
+
+        iframe { border: none; width: 100%; height: 100%; border-radius: 8px; }
+        
+        .settings-row { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;
+        }
+
+        /* Notifications */
+        #notification-area {
+            position: fixed; top: 20px; right: 20px; z-index: 10000;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .toast {
+            background: var(--glass); backdrop-filter: var(--bg-blur); padding: 15px 25px;
+            border-radius: 10px; border-left: 4px solid var(--accent);
+            animation: slideIn 0.3s forwards;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Boot Screen -->
+    <div id="boot-screen">
+        <div class="arc-reactor"></div>
+        <h2 style="font-family: Orbitron; margin-top: 20px; letter-spacing: 5px;">EDITH</h2>
+        <p style="font-size: 10px; margin-top: 10px; opacity: 0.5;">INITIALIZING HUD SYSTEM...</p>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="login-card">
+            <h1>WELCOME BACK</h1>
+            <input type="text" id="username" class="login-input" placeholder="Identity (e.g. Tony Stark)">
+            <input type="password" id="password" class="login-input" placeholder="Passcode">
+            <button class="login-btn" onclick="login()">AUTHORIZE</button>
+        </div>
+    </div>
+
+    <!-- Main Desktop -->
+    <div id="desktop">
+        <div id="icon-grid">
+            <div class="desktop-icon" onclick="openApp('ai')">
+                <i data-lucide="cpu"></i>
+                <span>EDITH AI</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('chat')">
+                <i data-lucide="share-2"></i>
+                <span>Global Link</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('browser')">
+                <i data-lucide="globe"></i>
+                <span>Browser</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('files')">
+                <i data-lucide="folder"></i>
+                <span>Storage</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('calc')">
+                <i data-lucide="calculator"></i>
+                <span>Calculator</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('maps')">
+                <i data-lucide="map"></i>
+                <span>Global Map</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('gmail')">
+                <i data-lucide="mail"></i>
+                <span>Gmail</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('media')">
+                <i data-lucide="play-circle"></i>
+                <span>Media</span>
+            </div>
+            <div class="desktop-icon" onclick="openApp('settings')">
+                <i data-lucide="settings"></i>
+                <span>System</span>
+            </div>
+        </div>
+
+        <!-- Taskbar -->
+        <div id="taskbar">
+            <div class="task-item" onclick="toggleStartMenu()"><i data-lucide="layout-grid"></i></div>
+            <div class="task-divider"></div>
+            <div id="running-apps" style="display: flex; gap: 10px;"></div>
+            <div class="task-divider"></div>
+            <div class="task-item" onclick="toggleMute()"><i id="vol-icon" data-lucide="volume-2"></i></div>
+            <div class="task-time" id="clock">00:00:00</div>
+        </div>
+    </div>
+
+    <div id="notification-area"></div>
+
+    <audio id="sound-boot" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"></audio>
+    <audio id="sound-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
+    <audio id="sound-notif" src="https://assets.mixkit.co/active_storage/sfx/2357/2357-preview.mp3"></audio>
+
+    <script>
+        /* --- CORE CONFIG & STATE --- */
+        const OS = {
+            user: "Alpha_" + Math.floor(Math.random()*99),
+            windows: {},
+            zIndex: 100,
+            isMuted: false,
+            settings: {
+                geminiKey: localStorage.getItem('edith_gemini_key') || '',
+                mapsKey: localStorage.getItem('edith_maps_key') || '',
+                wallpaper: localStorage.getItem('edith_wallpaper') || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2072',
+                theme: 'dark'
+            }
+        };
+
+        // --- GLOBAL LINK FIREBASE CONFIG ---[cite: 2]
+        const firebaseConfig = {
+            apiKey: "AIzaSyDwGVb_7gDoKks-pRp0GcVTTrKfY4VqMMo",
+            authDomain: "edith-2-5899b.firebaseapp.com",
+            databaseURL: "https://edith-2-5899b-default-rtdb.firebaseio.com",
+            projectId: "edith-2-5899b",
+            appId: "1:26114634502:web:86dc79c60fd95ac7062487"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database().ref('os_chat');
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Boot Sequence
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById('boot-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('boot-screen').style.display = 'none';
+                    document.getElementById('login-screen').style.display = 'flex';
+                }, 1000);
+            }, 2500);
+            
+            updateClock();
+            setInterval(updateClock, 1000);
+            applySettings();
+        };
+
+        function applySettings() {
+            document.getElementById('desktop').style.backgroundImage = `url('${OS.settings.wallpaper}')`;
+        }
+
+        function playSound(id) {
+            if(!OS.isMuted) {
+                const s = document.getElementById(id);
+                if(s) {
+                    s.currentTime = 0;
+                    s.play().catch(()=>{});
+                }
+            }
+        }
+
+        function notify(text) {
+            playSound('sound-notif');
+            const area = document.getElementById('notification-area');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<strong>SYSTEM:</strong> ${text}`;
+            area.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        /* --- AUTH SYSTEM --- */
+        function login() {
+            const user = document.getElementById('username').value || 'Tony';
+            OS.user = user;
+            playSound('sound-boot');
+            document.getElementById('login-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('login-screen').style.display = 'none';
+                notify(`Welcome back, ${user}. All systems online.`);
+                speak(`Welcome back, ${user}. Systems are green.`);
+            }, 500);
+        }
+
+        function speak(text) {
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.rate = 1.1;
+            window.speechSynthesis.speak(msg);
+        }
+
+        /* --- CLOCK --- */
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString([], { hour12: false });
+        }
+
+        /* --- WINDOW MANAGER --- */
+        function openApp(appId) {
+            playSound('sound-click');
+            if (OS.windows[appId]) {
+                focusWindow(appId);
+                return;
+            }
+
+            const config = {
+                ai: { title: 'EDITH AI', icon: 'cpu', content: getAIHTML(), width: 450, height: 550 },
+                chat: { title: 'Global Link', icon: 'share-2', content: getGlobalLinkHTML(), width: 450, height: 500 },
+                browser: { title: 'Web Browser', icon: 'globe', content: getBrowserHTML(), width: 900, height: 600 },
+                files: { title: 'File Manager', icon: 'folder', content: getFileHTML(), width: 600, height: 400 },
+                calc: { title: 'Calculator', icon: 'calculator', content: getCalcHTML(), width: 300, height: 450 },
+                maps: { title: 'Global Map', icon: 'map', content: getMapsHTML(), width: 800, height: 500 },
+                settings: { title: 'System Settings', icon: 'settings', content: getSettingsHTML(), width: 500, height: 450 },
+                gmail: { title: 'Gmail', icon: 'mail', content: `<iframe src="https://mail.google.com/mail/u/0/?ibv=0"></iframe>`, width: 1000, height: 700 },
+                media: { title: 'Media Player', icon: 'play-circle', content: getMediaHTML(), width: 400, height: 300 }
+            };
+
+            const app = config[appId];
+            const win = document.createElement('div');
+            win.id = `win-${appId}`;
+            win.className = 'window';
+            win.style.width = app.width + 'px';
+            win.style.height = app.height + 'px';
+            win.style.left = (window.innerWidth/2 - app.width/2 + (Object.keys(OS.windows).length * 20)) + 'px';
+            win.style.top = (window.innerHeight/2 - app.height/2 + (Object.keys(OS.windows).length * 20)) + 'px';
+            win.style.zIndex = OS.zIndex++;
+
+            win.innerHTML = `
+                <div class="win-header" onmousedown="dragWindow(event, '${appId}')">
+                    <div class="win-title"><i data-lucide="${app.icon}" style="width:14px"></i> ${app.title}</div>
+                    <div class="win-controls">
+                        <div class="win-btn btn-min" onclick="minimizeWindow('${appId}')"></div>
+                        <div class="win-btn btn-max" onclick="maximizeWindow('${appId}')"></div>
+                        <div class="win-btn btn-close" onclick="closeApp('${appId}')"></div>
+                    </div>
+                </div>
+                <div class="win-body">${app.content}</div>
+            `;
+
+            document.getElementById('desktop').appendChild(win);
+            OS.windows[appId] = win;
+            lucide.createIcons();
+            addTaskItem(appId, app.icon);
+
+            // Special init for Global Link
+            if(appId === 'chat') setupChatListener();
+        }
+
+        function addTaskItem(id, icon) {
+            const tray = document.getElementById('running-apps');
+            const item = document.createElement('div');
+            item.className = 'task-item';
+            item.id = `task-${id}`;
+            item.innerHTML = `<i data-lucide="${icon}"></i>`;
+            item.onclick = () => focusWindow(id);
+            tray.appendChild(item);
+            lucide.createIcons();
+        }
+
+        function closeApp(id) {
+            if(OS.windows[id]) {
+                OS.windows[id].remove();
+                delete OS.windows[id];
+                const taskItem = document.getElementById(`task-${id}`);
+                if(taskItem) taskItem.remove();
+            }
+        }
+
+        function focusWindow(id) {
+            if(OS.windows[id]) {
+                OS.windows[id].style.display = 'flex';
+                OS.windows[id].style.zIndex = OS.zIndex++;
+            }
+        }
+
+        function minimizeWindow(id) {
+            if(OS.windows[id]) OS.windows[id].style.display = 'none';
+        }
+
+        function maximizeWindow(id) {
+            const win = OS.windows[id];
+            if(win.dataset.maximized === 'true') {
+                win.style.width = win.dataset.oldW;
+                win.style.height = win.dataset.oldH;
+                win.style.top = win.dataset.oldT;
+                win.style.left = win.dataset.oldL;
+                win.dataset.maximized = 'false';
+            } else {
+                win.dataset.oldW = win.style.width;
+                win.dataset.oldH = win.style.height;
+                win.dataset.oldT = win.style.top;
+                win.dataset.oldL = win.style.left;
+                win.style.width = '100vw';
+                win.style.height = 'calc(100vh - 60px)';
+                win.style.top = '0';
+                win.style.left = '0';
+                win.dataset.maximized = 'true';
+            }
+        }
+
+        function dragWindow(e, id) {
+            const win = OS.windows[id];
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            
+            focusWindow(id);
+
+            document.onmousemove = (e) => {
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                win.style.top = (win.offsetTop - pos2) + "px";
+                win.style.left = (win.offsetLeft - pos1) + "px";
+            };
+
+            document.onmouseup = () => {
+                document.onmousemove = null;
+                document.onmouseup = null;
+            };
+        }
+
+        /* --- GLOBAL LINK (FIREBASE CHAT) LOGIC ---[cite: 2] */
+        function getGlobalLinkHTML() {
+            return `
+                <div style="display:flex; flex-direction:column; height:100%;">
+                    <div id="chat-history"></div>
+                    <div style="padding:10px; background:rgba(0,0,0,0.3); display:flex; gap:10px;">
+                        <input type="text" id="chat-input" class="login-input" style="margin:0; flex:1;" placeholder="Enter secure data..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                        <button onclick="sendChatMessage()" class="login-btn" style="width:auto; padding:0 20px;">SEND</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            if(!input.value) return;
+            db.push({ user: OS.user, text: input.value });
+            input.value = "";
+        }
+
+        function setupChatListener() {
+            db.limitToLast(15).on('child_added', snap => {
+                const data = snap.val();
+                const display = document.getElementById('chat-history');
+                if(!display) return;
+                const div = document.createElement('div');
+                div.className = `bubble ${data.user === OS.user ? 'me' : 'other'}`;
+                div.innerText = `${data.user}: ${data.text}`;
+                display.appendChild(div);
+                display.scrollTop = display.scrollHeight;
+            });
+        }
+
+        /* --- REST OF APP CONTENT GENERATORS --- */
+        function getAIHTML() {
+            return `
+                <div class="ai-container">
+                    <div id="ai-chat">
+                        <div class="chat-msg msg-ai">System active. How can I assist you, Boss?</div>
+                    </div>
+                    <div class="ai-input-area">
+                        <input type="text" id="ai-input" class="login-input" placeholder="Ask EDITH..." style="margin:0" onkeydown="if(event.key==='Enter') askAI()">
+                        <button class="login-btn" style="width:auto; padding:0 20px" onclick="askAI()">Send</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function askAI() {
+            const input = document.getElementById('ai-input');
+            const chat = document.getElementById('ai-chat');
+            const val = input.value;
+            if(!val) return;
+
+            chat.innerHTML += `<div class="chat-msg msg-user">${val}</div>`;
+            input.value = '';
+
+            if(!OS.settings.geminiKey) {
+                chat.innerHTML += `<div class="chat-msg msg-ai">Error: Gemini API Key not found. Please add it in System Settings.</div>`;
+                return;
+            }
+
+            const key = OS.settings.geminiKey; 
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+            try {
+                const resp = await fetch(`${url}?key=${key}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: val }] }] })
+                });
+
+                const data = await resp.json();
+                
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    let text = data.candidates[0].content.parts[0].text;
+                    chat.innerHTML += `<div class="chat-msg msg-ai">${text}</div>`;
+                } else if (data.error) {
+                    chat.innerHTML += `<div class="chat-msg msg-ai" style="color:orange">API Error: ${data.error.message}</div>`;
+                }
+            } catch (e) {
+                chat.innerHTML += `<div class="chat-msg msg-ai" style="color:red">Connection error. Check console.</div>`;
+                console.error(e);
+            }
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function getCalcHTML() {
+            return `
+                <div class="calc-display" id="calc-res">0</div>
+                <div class="calc-grid">
+                    ${['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'].map(btn => 
+                        `<button class="calc-btn" onclick="handleCalc('${btn}')">${btn}</button>`
+                    ).join('')}
+                    <button class="calc-btn" style="grid-column: span 4" onclick="handleCalc('C')">CLEAR</button>
+                </div>
+            `;
+        }
+        let calcVal = '';
+        function handleCalc(val) {
+            const disp = document.getElementById('calc-res');
+            if(val === '=') { try { calcVal = eval(calcVal); } catch { calcVal = 'Error'; } }
+            else if(val === 'C') { calcVal = ''; }
+            else { calcVal += val; }
+            disp.innerText = calcVal || '0';
+        }
+
+        function getBrowserHTML() {
+            return `
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input type="text" id="browser-url" class="login-input" style="margin:0" placeholder="Search Wikipedia or Enter URL...">
+                    <button class="login-btn" style="width:auto; padding:0 20px" onclick="browse()">GO</button>
+                </div>
+                <div id="browser-frame" style="height:calc(100% - 60px); background: white; border-radius:8px; overflow:auto; color: black; padding: 20px;">
+                    Welcome to EDITH Web. Use the search bar to access intelligence.
+                </div>
+            `;
+        }
+
+        async function browse() {
+            const query = document.getElementById('browser-url').value;
+            const frame = document.getElementById('browser-frame');
+            if(query.startsWith('http')) {
+                frame.innerHTML = `<iframe src="${query}"></iframe>`;
+            } else {
+                frame.innerHTML = "Searching Intelligence Database...";
+                try {
+                    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
+                    const data = await res.json();
+                    frame.innerHTML = `<h3>${data.title}</h3><hr><br><p>${data.extract || 'No information found.'}</p>`;
+                } catch {
+                    frame.innerHTML = "Database unreachable.";
+                }
+            }
+        }
+
+        function getSettingsHTML() {
+            return `
+                <div class="settings-row">
+                    <span>Gemini API Key</span>
+                    <input type="password" class="login-input" style="width:200px; margin:0" id="set-gemini" value="${OS.settings.geminiKey}" onchange="saveSet('geminiKey', this.value)">
+                </div>
+                <div class="settings-row">
+                    <span>Google Maps API Key</span>
+                    <input type="password" class="login-input" style="width:200px; margin:0" id="set-maps" value="${OS.settings.mapsKey}" onchange="saveSet('mapsKey', this.value)">
+                </div>
+                <div class="settings-row">
+                    <span>Wallpaper URL</span>
+                    <input type="text" class="login-input" style="width:200px; margin:0" id="set-wall" value="${OS.settings.wallpaper}" onchange="saveSet('wallpaper', this.value)">
+                </div>
+                <div class="settings-row">
+                    <span>Upload Local Wallpaper</span>
+                    <input type="file" id="wall-file" style="display:none" onchange="uploadWall(event)">
+                    <button class="login-btn" style="width:auto; padding:5px 15px" onclick="document.getElementById('wall-file').click()">SELECT</button>
+                </div>
+                <div class="settings-row">
+                    <span>Volume Control</span>
+                    <input type="range" min="0" max="100" value="100" onchange="OS.isMuted = (this.value == 0)">
+                </div>
+                <button class="login-btn" onclick="applySettings(); notify('Settings Synchronized.')">APPLY CHANGES</button>
+            `;
+        }
+
+        function saveSet(key, val) {
+            OS.settings[key] = val;
+            localStorage.setItem('edith_' + key, val);
+        }
+
+        function uploadWall(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (f) => {
+                saveSet('wallpaper', f.target.result);
+                applySettings();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function getMapsHTML() {
+            if(!OS.settings.mapsKey) return `<div style="padding:20px; text-align:center">Map Module requires Google Maps API Key in Settings.</div>`;
+            return `<iframe src="https://www.google.com/maps/embed/v1/place?key=${OS.settings.mapsKey}&q=Stark+Tower,NY"></iframe>`;
+        }
+
+        function getFileHTML() {
+            return `
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                    <div style="text-align:center"><i data-lucide="file-text"></i><br>Manifest.json</div>
+                    <div style="text-align:center"><i data-lucide="file-text"></i><br>Mark_85_Blueprints.pdf</div>
+                    <div style="text-align:center"><i data-lucide="image"></i><br>Pepper.jpg</div>
+                    <div style="text-align:center"><i data-lucide="video"></i><br>Training_Log.mp4</div>
+                </div>
+            `;
+        }
+
+        function getMediaHTML() {
+            return `
+                <div style="text-align:center; padding:20px;">
+                    <i data-lucide="music" style="width:64px; height:64px; color:var(--accent)"></i>
+                    <p style="margin:20px 0;">No media playing.</p>
+                    <input type="file" id="media-input" style="display:none" accept="audio/*,video/*" onchange="playMedia(event)">
+                    <button class="login-btn" onclick="document.getElementById('media-input').click()">LOAD LOCAL FILE</button>
+                    <div id="media-player-container" style="margin-top:10px;"></div>
+                </div>
+            `;
+        }
+
+        function playMedia(e) {
+            const file = e.target.files[0];
+            const url = URL.createObjectURL(file);
+            const container = document.getElementById('media-player-container');
+            if(file.type.startsWith('video')) {
+                container.innerHTML = `<video src="${url}" controls style="width:100%"></video>`;
+            } else {
+                container.innerHTML = `<audio src="${url}" controls style="width:100%"></audio>`;
+            }
+        }
+
+        function toggleMute() {
+            OS.isMuted = !OS.isMuted;
+            document.getElementById('vol-icon').setAttribute('data-lucide', OS.isMuted ? 'volume-x' : 'volume-2');
+            lucide.createIcons();
+        }
+
+        function toggleStartMenu() {
+            notify("EDITH v1.0.4. Protocols active.");
+        }
+
+        // Window interaction sounds
+        document.addEventListener('mousedown', (e) => {
+            if(e.target.closest('.win-btn') || e.target.closest('.desktop-icon') || e.target.closest('.task-item')) {
+                playSound('sound-click');
+            }
+        });
+
+    </script>
+</body>
+</html>
