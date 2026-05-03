@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDITH OS - Even Dead, I Am The Hero</title>
     
-    <!-- External Dependencies -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -25,7 +24,6 @@
         
         body, html { height: 100vh; width: 100vw; overflow: hidden; background: #000; color: var(--text); }
 
-        /* --- Boot & Login Screens --- */
         #boot-screen {
             position: fixed; inset: 0; background: #000; z-index: 10001;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -68,11 +66,35 @@
             display: none; flex-direction: column;
         }
 
-        /* Glassmorphism Utility */
         .glass { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); background: var(--glass); border: 1px solid var(--border); }
 
-        /* Window Manager Styles */
         #window-container { flex: 1; position: relative; width: 100%; }
+
+        .desktop-icons {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 100px);
+            grid-template-rows: repeat(auto-fill, 100px);
+            gap: 20px;
+            z-index: 5;
+        }
+
+        .desktop-app {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 90px;
+            height: 90px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .desktop-app:hover { background: rgba(255, 255, 255, 0.1); }
+        .desktop-app span { font-size: 11px; margin-top: 8px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); text-align: center; }
 
         .window {
             position: absolute; min-width: 300px; min-height: 200px;
@@ -95,7 +117,6 @@
 
         .window-content { flex: 1; overflow: auto; background: rgba(10, 10, 12, 0.6); position: relative; }
 
-        /* Taskbar */
         #taskbar {
             height: 55px; width: 100%; display: flex; align-items: center;
             padding: 0 15px; gap: 10px; z-index: 9999; border-top: 1px solid var(--border);
@@ -116,7 +137,6 @@
         .taskbar-spacer { flex: 1; }
         .sys-tray { font-size: 13px; font-weight: 500; padding: 0 10px; }
 
-        /* Start Menu */
         #start-menu {
             position: absolute; bottom: 65px; left: 15px; width: 400px; height: 500px;
             border-radius: 15px; z-index: 9998; padding: 25px;
@@ -132,7 +152,6 @@
         .app-icon:hover { background: rgba(255,255,255,0.1); }
         .app-icon span { font-size: 11px; text-align: center; }
 
-        /* App Specific UIs */
         .full-h { height: 100%; display: flex; flex-direction: column; }
         input, textarea, button { 
             background: rgba(255,255,255,0.05); border: 1px solid var(--border); 
@@ -164,14 +183,12 @@
 </head>
 <body>
 
-<!-- Boot Screen -->
 <div id="boot-screen">
     <div class="arc-reactor"></div>
     <h2 style="font-family: 'Segoe UI'; margin-top: 20px; letter-spacing: 5px; color: var(--accent)">EDITH</h2>
     <p style="font-size: 10px; margin-top: 10px; opacity: 0.5;">INITIALIZING HUD SYSTEM...</p>
 </div>
 
-<!-- Login Screen -->
 <div id="login-screen">
     <div class="login-card">
         <h1 style="color: var(--accent); margin-bottom: 20px; font-size: 24px;">WELCOME BACK</h1>
@@ -185,6 +202,7 @@
 </div>
 
 <div id="desktop">
+    <div class="desktop-icons" id="desktop-grid"></div>
     <div id="window-container"></div>
 
     <div id="start-menu" class="glass">
@@ -208,10 +226,6 @@
 </div>
 
 <script>
-/**
- * EDITH OS KERNEL - STARK INDUSTRIES
- */
-
 const APPS = {
     ai: { name: "EDITH AI", icon: "cpu", color: "#9b59b6" },
     chat: { name: "Social", icon: "message-circle", color: "#00d2ff" },
@@ -247,7 +261,6 @@ const OS = {
     },
 
     boot() {
-        // Apply saved background
         document.documentElement.style.setProperty('--bg-url', `url('${this.state.bgUrl}')`);
 
         setTimeout(() => {
@@ -259,6 +272,7 @@ const OS = {
         }, 2500);
 
         this.renderStartMenu();
+        this.renderDesktopIcons();
         this.initClock();
         this.initFirebase();
         lucide.createIcons();
@@ -308,6 +322,18 @@ const OS = {
         setInterval(() => {
             el.innerText = new Date().toLocaleTimeString();
         }, 1000);
+    },
+
+    renderDesktopIcons() {
+        const container = document.getElementById('desktop-grid');
+        Object.keys(APPS).forEach(id => {
+            const app = APPS[id];
+            const div = document.createElement('div');
+            div.className = 'desktop-app';
+            div.innerHTML = `<i data-lucide="${app.icon}" style="color:${app.color}; width: 32px; height: 32px;"></i><span>${app.name}</span>`;
+            div.onclick = () => this.launch(id);
+            container.appendChild(div);
+        });
     },
 
     renderStartMenu() {
@@ -639,7 +665,6 @@ const OS = {
     }
 };
 
-// INITIALIZE KERNEL
 OS.boot();
 </script>
 
